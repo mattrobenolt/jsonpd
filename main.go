@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"runtime"
+	"sync/atomic"
 	"time"
 )
 
@@ -77,6 +78,15 @@ var (
 	CALLBACK_RE = regexp.MustCompile(`^[$a-zA-Z_][0-9a-zA-Z_\.\[\]]*$`)
 )
 
+var (
+	COUNTER_200,
+	COUNTER_400,
+	COUNTER_E_EMPTY,
+	COUNTER_E_TOOLONG,
+	COUNTER_E_RESERVED,
+	COUNTER_E_INVALID uint64
+)
+
 type Handler struct{}
 
 func (*Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -87,8 +97,16 @@ func (*Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q.Del(*callback)
 
 	if err := isValid(cb); err != nil {
-		if err == E_TOOLONG {
+		switch err {
+		case E_EMPTY:
+			atomic.AddUint64(&COUNTER_E_EMPTY, 1)
+		case E_TOOLONG:
+			atomic.AddUint64(&COUNTER_E_TOOLONG, 1)
 			cb = cb[:50]
+		case E_RESERVED:
+			atomic.AddUint64(&COUNTER_E_RESERVED, 1)
+		case E_INVALID:
+			atomic.AddUint64(&COUNTER_E_INVALID, 1)
 		}
 		log.Printf("[reject] %s: %s", err, cb)
 		handle400(w, r)
@@ -109,6 +127,8 @@ func (*Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(qs))
 	}
 	w.Write([]byte("\"/>);\n-->\n"))
+
+	atomic.AddUint64(&COUNTER_200, 1)
 }
 
 var (
@@ -147,6 +167,8 @@ func handle400(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "close")
 	w.WriteHeader(400)
 	w.Write([]byte("<html><body><h1>400 Bad Request</h1></body></html>\n"))
+
+	atomic.AddUint64(&COUNTER_400, 1)
 }
 
 var (
