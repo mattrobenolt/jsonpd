@@ -86,6 +86,7 @@ var (
 	COUNTER_E_TOOLONG,
 	COUNTER_E_RESERVED,
 	COUNTER_E_INVALID uint64
+	BEGIN = time.Now()
 )
 
 type Handler struct{}
@@ -171,6 +172,7 @@ func handle400(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeStats(w io.Writer) {
+	w.Write([]byte(fmt.Sprintln("uptime:", int64(time.Now().Sub(BEGIN).Seconds()))))
 	w.Write([]byte(fmt.Sprintln("ok:", COUNTER_OK)))
 	w.Write([]byte(fmt.Sprintln("e_empty:", COUNTER_E_EMPTY)))
 	w.Write([]byte(fmt.Sprintln("e_toolong:", COUNTER_E_TOOLONG)))
