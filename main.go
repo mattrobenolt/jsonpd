@@ -181,11 +181,11 @@ func writeStats(w io.Writer) {
 }
 
 var (
-	bind     = flag.String("b", ":8000", "bind address (default: :8000)")
+	bind     = flag.String("b", "localhost:8000", "bind address (default: localhost:8000)")
 	procs    = flag.Int("n", runtime.NumCPU(), fmt.Sprintf("num procs (default: %d)", runtime.NumCPU()))
 	callback = flag.String("cb", "callback", "callback argument (default: callback)")
 	timeout  = flag.Int("t", 500, "timeout (default: 500)")
-	info     = flag.String("i", ":8001", "bind address for stats (default: 8001)")
+	info     = flag.String("i", "localhost:8001", "bind address for stats (default: localhost:8001)")
 )
 
 func init() {
