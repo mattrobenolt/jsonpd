@@ -4,7 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -79,8 +81,7 @@ var (
 )
 
 var (
-	COUNTER_200,
-	COUNTER_400,
+	COUNTER_OK,
 	COUNTER_E_EMPTY,
 	COUNTER_E_TOOLONG,
 	COUNTER_E_RESERVED,
@@ -128,7 +129,7 @@ func (*Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write([]byte("\"/>);\n-->\n"))
 
-	atomic.AddUint64(&COUNTER_200, 1)
+	atomic.AddUint64(&COUNTER_OK, 1)
 }
 
 var (
@@ -167,8 +168,14 @@ func handle400(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "close")
 	w.WriteHeader(400)
 	w.Write([]byte("<html><body><h1>400 Bad Request</h1></body></html>\n"))
+}
 
-	atomic.AddUint64(&COUNTER_400, 1)
+func writeStats(w io.Writer) {
+	w.Write([]byte(fmt.Sprintln("ok:", COUNTER_OK)))
+	w.Write([]byte(fmt.Sprintln("e_empty:", COUNTER_E_EMPTY)))
+	w.Write([]byte(fmt.Sprintln("e_toolong:", COUNTER_E_TOOLONG)))
+	w.Write([]byte(fmt.Sprintln("e_reserved:", COUNTER_E_RESERVED)))
+	w.Write([]byte(fmt.Sprintln("e_invalid:", COUNTER_E_INVALID)))
 }
 
 var (
@@ -176,6 +183,7 @@ var (
 	procs    = flag.Int("n", runtime.NumCPU(), fmt.Sprintf("num procs (default: %d)", runtime.NumCPU()))
 	callback = flag.String("cb", "callback", "callback argument (default: callback)")
 	timeout  = flag.Int("t", 500, "timeout (default: 500)")
+	info     = flag.String("i", ":8001", "bind address for stats (default: 8001)")
 )
 
 func init() {
@@ -199,6 +207,7 @@ func main() {
 
 	fmt.Println("procs:", *procs)
 	fmt.Println("bind:", *bind)
+	fmt.Println("info:", *info)
 	fmt.Println("callback:", *callback)
 	fmt.Println("timeout:", time.Duration(*timeout)*time.Millisecond)
 
@@ -208,6 +217,22 @@ func main() {
 		ReadTimeout:  time.Duration(*timeout) * time.Millisecond,
 		WriteTimeout: time.Duration(*timeout) * time.Millisecond,
 	}
+
+	ln, err := net.Listen("tcp", *info)
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				continue
+			}
+			writeStats(conn)
+			conn.Close()
+		}
+	}()
+
 	fmt.Println("")
 	log.Println("ready.")
 	log.Fatal(s.ListenAndServe())
